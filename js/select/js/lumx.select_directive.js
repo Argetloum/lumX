@@ -4,17 +4,20 @@
 
 
 angular.module('lumx.select', [])
-    .controller('LxSelectController', ['$scope', '$compile', '$interpolate', '$sce', function($scope, $compile, $interpolate, $sce)
+    .controller('LxSelectController', ['$scope', '$compile', '$interpolate', '$sce',
+                                       function($scope, $compile, $interpolate, $sce)
     {
         var self = this;
 
+        // Link methods
         this.init = function(element, attrs)
         {
             $scope.multiple = angular.isDefined(attrs.multiple);
             $scope.tree = angular.isDefined(attrs.tree);
         };
 
-        $scope.select = function(choice)
+        // Selection management
+        function select(choice)
         {
             if ($scope.multiple)
             {
@@ -29,59 +32,58 @@ angular.module('lumx.select', [])
             }
         };
 
-        $scope.unselect = function(element)
+        function unselect(element)
         {
-            if (_.indexOf($scope.selected, element) !== -1)
+            var index = _.indexOf($scope.selected, element);
+            if (index !== -1)
             {
-                $scope.selected.splice(_.indexOf($scope.selected, element), 1);
+                $scope.selected.splice(index, 1);
             }
         };
 
-        $scope.selectedElements = function()
-        {
-            return angular.isDefined($scope.selected) ? $scope.selected : [];
-        };
-
-        $scope.getSelectedTemplate = function()
-        {
-            return $sce.trustAsHtml($scope.selectedTemplate);
-        };
-
-        $scope.toggle = function(choice, event)
+        function toggle(choice, event)
         {
             if (angular.isDefined(event) && $scope.multiple)
             {
                 event.stopPropagation();
             }
 
-            if ($scope.multiple)
+            if ($scope.multiple && isSelected(choice))
             {
-                if ($scope.isSelected(choice))
-                {
-                    $scope.unselect(choice);
-                }
-                else
-                {
-                    $scope.select(choice);
-                }
+                unselect(choice);
             }
             else
             {
-                $scope.select(choice);
+                select(choice);
             }
         };
 
-        $scope.isSelected = function(choice)
+        // Getters
+        function isSelected(choice)
         {
-            return _.indexOf($scope.selectedElements(), choice) > -1;
+            return _.indexOf(getSelectedElements(), choice) > -1;
         };
 
+        /**
+         * Return the array of selected elements. Always return an array (ie. returns an empty array in case
+         * selected list is undefined in the scope).
+         */
+        function getSelectedElements()
+        {
+            return angular.isDefined($scope.selected) ? $scope.selected : [];
+        };
+
+        function getSelectedTemplate()
+        {
+            return $sce.trustAsHtml($scope.selectedTemplate);
+        };
+
+        // Watchers
         $scope.$watch('selected', function(newValue)
         {
             if (angular.isDefined(newValue) && angular.isDefined($scope.selectedTransclude))
             {
                 var newScope = $scope.$new();
-
                 $scope.selectedTemplate = '';
 
                 angular.forEach(newValue, function(selectedElement)
@@ -108,11 +110,20 @@ angular.module('lumx.select', [])
                 });
 
                 // Exec function callback if set
-                if(angular.isDefined($scope.change)) {
+                if(angular.isDefined($scope.change))
+                {
                     $scope.change();
                 }
             }
         }, true);
+
+        // Public API
+        $scope.select = select;
+        $scope.unselect = unselect;
+        $scope.toggle = toggle;
+        $scope.isSelected = isSelected;
+        $scope.getSelectedElements = getSelectedElements;
+        $scope.getSelectedTemplate = getSelectedTemplate;
     }])
     .directive('lxSelect', function()
     {
