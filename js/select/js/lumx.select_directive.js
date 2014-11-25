@@ -13,8 +13,8 @@ angular.module('lumx.select', [])
             $scope.multiple = angular.isDefined(attrs.multiple);
             $scope.tree = angular.isDefined(attrs.tree);
         };
-        
-        this.select = function(choice)
+
+        $scope.select = function(choice)
         {
             if ($scope.multiple)
             {
@@ -28,8 +28,8 @@ angular.module('lumx.select', [])
                 $scope.selected = [choice];
             }
         };
-        
-        this.unselect = function(element)
+
+        $scope.unselect = function(element)
         {
             if (_.indexOf($scope.selected, element) !== -1)
             {
@@ -37,34 +37,48 @@ angular.module('lumx.select', [])
             }
         };
 
-        this.selectedElements = function()
+        $scope.selectedElements = function()
         {
             return angular.isDefined($scope.selected) ? $scope.selected : [];
         };
 
-        this.getPlaceholder = function()
-        {
-            return $scope.placeholder;
-        };
-
-        this.getSelectedTemplate = function()
+        $scope.getSelectedTemplate = function()
         {
             return $sce.trustAsHtml($scope.selectedTemplate);
         };
-        
-        this.isMultiple = function()
+
+        $scope.toggle = function(choice, event)
         {
-            return $scope.multiple;
+            if (angular.isDefined(event) && $scope.multiple)
+            {
+                event.stopPropagation();
+            }
+
+            if ($scope.multiple)
+            {
+                if ($scope.isSelected(choice))
+                {
+                    $scope.unselect(choice);
+                }
+                else
+                {
+                    $scope.select(choice);
+                }
+            }
+            else
+            {
+                $scope.select(choice);
+            }
         };
 
-        this.isTree = function()
+        $scope.isSelected = function(choice)
         {
-            return $scope.tree;
+            return _.indexOf($scope.selectedElements(), choice) > -1;
         };
 
         $scope.$watch('selected', function(newValue)
         {
-            if (angular.isDefined(newValue) && angular.isDefined(self.selectedTransclude))
+            if (angular.isDefined(newValue) && angular.isDefined($scope.selectedTransclude))
             {
                 var newScope = $scope.$new();
 
@@ -74,7 +88,7 @@ angular.module('lumx.select', [])
                 {
                     newScope.$selected = selectedElement;
 
-                    self.selectedTransclude(newScope, function(clone)
+                    $scope.selectedTransclude(newScope, function(clone)
                     {
                         var div = angular.element('<div/>'),
                             element = $compile(clone)(newScope),
@@ -84,7 +98,7 @@ angular.module('lumx.select', [])
 
                         div.append(element);
 
-                        if (self.isMultiple())
+                        if ($scope.multiple)
                         {
                             div.find('span').addClass('lx-select__tag');
                         }
@@ -108,7 +122,8 @@ angular.module('lumx.select', [])
             scope: {
                 selected: '=',
                 placeholder: '=',
-                change: '&change'
+                choices: '=',
+                change: '&'
             },
             templateUrl: 'lumx.select.html',
             transclude: true,
@@ -124,21 +139,11 @@ angular.module('lumx.select', [])
         return {
             restrict: 'E',
             require: '^lxSelect',
-            scope: {},
             templateUrl: 'lumx.select_selected.html',
             transclude: true,
-            controller: function($scope)
-            {
-                $scope.unselect = function(element)
-                {
-                    $scope.selectController.unselect(element);
-                };
-            },
             link: function(scope, element, attrs, ctrl, transclude)
             {
-                scope.selectController = ctrl;
-
-                ctrl.selectedTransclude = transclude;
+                scope.$parent.$parent.selectedTransclude = transclude;
             }
         };
     })
@@ -147,45 +152,7 @@ angular.module('lumx.select', [])
         return {
             restrict: 'E',
             require: '^lxSelect',
-            scope: {
-                choices: '='
-            },
             templateUrl: 'lumx.select_choices.html',
-            transclude: true,
-            controller: function($scope)
-            {
-                $scope.select = function(choice, event)
-                {
-                    if (angular.isDefined(event) && $scope.selectController.isMultiple())
-                    {
-                        event.stopPropagation();
-                    }
-
-                    if ($scope.selectController.isMultiple())
-                    {
-                        if ($scope.isSelected(choice))
-                        {
-                            $scope.selectController.unselect(choice);
-                        }
-                        else
-                        {
-                            $scope.selectController.select(choice);
-                        }
-                    }
-                    else
-                    {
-                        $scope.selectController.select(choice);
-                    }
-                };
-
-                $scope.isSelected = function(choice)
-                {
-                    return _.indexOf($scope.selectController.selectedElements(), choice) > -1;
-                };
-            },
-            link: function(scope, element, attrs, ctrl)
-            {
-                scope.selectController = ctrl;
-            }
+            transclude: true
         };
     });
