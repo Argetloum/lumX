@@ -19,7 +19,7 @@
         display: block;
     }
 }
-    
+
     // Select selected
     .lx-select__selected {
         position: relative;
@@ -64,6 +64,7 @@
         background-color: #f5f5f5;
         @include font-size(14px);
         line-height: 24px;
+        @include user-select(none);
 
         &:last-child {
             margin-right: 0;
@@ -114,6 +115,18 @@
         &:after {
             @include transform(scale(1));
         }
+    }
+
+    .lx-select__help {
+        padding: auto 16px;
+        @include font-size(12px);
+        font-weight: 300;
+        color: #999;
+        text-align: center;
+    }
+
+    .lx-select__loader {
+        @include animation(spin 1.5s linear infinite);
     }
 
     // Select chosen

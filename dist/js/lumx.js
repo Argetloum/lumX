@@ -1167,7 +1167,7 @@ angular.module('lumx.utils.transclude', [])
         $provide.decorator('ngTranscludeDirective', ['$delegate', function($delegate)
         {
             $delegate.shift();
-            
+
             return $delegate;
         }]);
     })
@@ -1178,18 +1178,19 @@ angular.module('lumx.utils.transclude', [])
             link: function(scope, element, attrs, ctrl, transclude)
             {
                 var iScopeType = attrs.ngTransclude || 'sibling';
+                // console.log('iScopeType: ' + iScopeType);
 
                 switch (iScopeType)
                 {
                     case 'sibling':
-                        transclude( function(clone)
+                        transclude(function(clone)
                         {
                             element.empty();
                             element.append(clone);
                         });
                         break;
                     case 'parent':
-                        transclude( scope, function(clone)
+                        transclude(scope, function(clone)
                         {
                             element.empty();
                             element.append(clone);
@@ -1197,7 +1198,7 @@ angular.module('lumx.utils.transclude', [])
                         break;
                     case 'child':
                         var iChildScope = scope.$new();
-                        
+
                         transclude(iChildScope, function(clone)
                         {
                             element.empty();
@@ -1205,13 +1206,14 @@ angular.module('lumx.utils.transclude', [])
                             element.on('$destroy', function()
                             {
                                 iChildScope.$destroy();
-                            });            
+                            });
                         });
                         break;
                 }
             }
         };
     });
+
 /* global angular */
 'use strict'; // jshint ignore:line
 
@@ -1673,17 +1675,20 @@ angular.module('lumx.input-group', [])
 
 
 angular.module('lumx.select', [])
-    .controller('LxSelectController', ['$scope', '$compile', '$interpolate', '$sce', function($scope, $compile, $interpolate, $sce)
+    .controller('LxSelectController', ['$scope', '$compile', '$filter', '$interpolate', '$sce',
+                                       function($scope, $compile, $filter, $interpolate, $sce)
     {
         var self = this;
 
+        // Link methods
         this.init = function(element, attrs)
         {
             $scope.multiple = angular.isDefined(attrs.multiple);
             $scope.tree = angular.isDefined(attrs.tree);
         };
-        
-        this.select = function(choice)
+
+        // Selection management
+        function select(choice)
         {
             if ($scope.multiple)
             {
@@ -1696,54 +1701,77 @@ angular.module('lumx.select', [])
             {
                 $scope.selected = [choice];
             }
-        };
-        
-        this.unselect = function(element)
-        {
-            if (_.indexOf($scope.selected, element) !== -1)
-            {
-                $scope.selected.splice(_.indexOf($scope.selected, element), 1);
-            }
-        };
+        }
 
-        this.selectedElements = function()
+        function unselect(element)
+        {
+            var index = _.indexOf($scope.selected, element);
+            if (index !== -1)
+            {
+                $scope.selected.splice(index, 1);
+            }
+        }
+
+        function toggle(choice, event)
+        {
+            if (angular.isDefined(event) && $scope.multiple)
+            {
+                event.stopPropagation();
+            }
+
+            if ($scope.multiple && isSelected(choice))
+            {
+                unselect(choice);
+            }
+            else
+            {
+                select(choice);
+            }
+        }
+
+        // Getters
+        function isSelected(choice)
+        {
+            return _.indexOf(getSelectedElements(), choice) > -1;
+        }
+
+        function hasNoResults()
+        {
+            return angular.isUndefined($scope.choices) || $filter('filter')($scope.choices, $scope.data.filter).length === 0;
+        }
+
+        function filterNeeded()
+        {
+            return angular.isDefined($scope.minLength) && $scope.data.filter.length < $scope.minLength;
+        }
+
+        /**
+         * Return the array of selected elements. Always return an array (ie. returns an empty array in case
+         * selected list is undefined in the scope).
+         */
+        function getSelectedElements()
         {
             return angular.isDefined($scope.selected) ? $scope.selected : [];
-        };
+        }
 
-        this.getPlaceholder = function()
-        {
-            return $scope.placeholder;
-        };
-
-        this.getSelectedTemplate = function()
+        function getSelectedTemplate()
         {
             return $sce.trustAsHtml($scope.selectedTemplate);
-        };
-        
-        this.isMultiple = function()
-        {
-            return $scope.multiple;
-        };
+        }
 
-        this.isTree = function()
+        // Watchers
+        $scope.$watch('selected', function(newValue, oldValue)
         {
-            return $scope.tree;
-        };
-
-        $scope.$watch('selected', function(newValue)
-        {
-            if (angular.isDefined(newValue) && angular.isDefined(self.selectedTransclude))
+            if (angular.isDefined(newValue) && angular.isDefined($scope.selectedTransclude))
             {
                 var newScope = $scope.$new();
-
                 $scope.selectedTemplate = '';
 
                 angular.forEach(newValue, function(selectedElement)
                 {
                     newScope.$selected = selectedElement;
 
-                    self.selectedTransclude(newScope, function(clone)
+                    $scope.selectedTransclude(newScope, function(clone)
                     {
                         var div = angular.element('<div/>'),
                             element = $compile(clone)(newScope),
@@ -1753,7 +1781,7 @@ angular.module('lumx.select', [])
 
                         div.append(element);
 
-                        if (self.isMultiple())
+                        if ($scope.multiple)
                         {
                             div.find('span').addClass('lx-select__tag');
                         }
@@ -1763,11 +1791,27 @@ angular.module('lumx.select', [])
                 });
 
                 // Exec function callback if set
-                if(angular.isDefined($scope.change)) {
-                    $scope.change();
-                }
+                $scope.change({ newValue: newValue, oldValue: oldValue });
             }
         }, true);
+
+        $scope.$watch('data.filter', function(newValue, oldValue)
+        {
+            if(angular.isUndefined($scope.minLength) || (newValue && $scope.minLength <= newValue.length))
+            {
+                $scope.filter({ newValue: newValue, oldValue: oldValue });
+            }
+        });
+
+        // Public API
+        $scope.select = select;
+        $scope.unselect = unselect;
+        $scope.toggle = toggle;
+        $scope.isSelected = isSelected;
+        $scope.filterNeeded = filterNeeded;
+        $scope.getSelectedElements = getSelectedElements;
+        $scope.getSelectedTemplate = getSelectedTemplate;
+        $scope.hasNoResults = hasNoResults;
     }])
     .directive('lxSelect', function()
     {
@@ -1777,7 +1821,11 @@ angular.module('lumx.select', [])
             scope: {
                 selected: '=',
                 placeholder: '=',
-                change: '&change'
+                choices: '=',
+                loading: '=',
+                minLength: '=',
+                change: '&', // Parameters: newValue, oldValue
+                filter: '&' // Parameters: newValue, oldValue
             },
             templateUrl: 'lumx.select.html',
             transclude: true,
@@ -1785,6 +1833,9 @@ angular.module('lumx.select', [])
             link: function(scope, element, attrs, ctrl)
             {
                 ctrl.init(element, attrs);
+                scope.data = {
+                    filter: ''
+                };
             }
         };
     })
@@ -1793,21 +1844,11 @@ angular.module('lumx.select', [])
         return {
             restrict: 'E',
             require: '^lxSelect',
-            scope: {},
             templateUrl: 'lumx.select_selected.html',
             transclude: true,
-            controller: function($scope)
-            {
-                $scope.unselect = function(element)
-                {
-                    $scope.selectController.unselect(element);
-                };
-            },
             link: function(scope, element, attrs, ctrl, transclude)
             {
-                scope.selectController = ctrl;
-
-                ctrl.selectedTransclude = transclude;
+                scope.$parent.$parent.selectedTransclude = transclude;
             }
         };
     })
@@ -1816,48 +1857,11 @@ angular.module('lumx.select', [])
         return {
             restrict: 'E',
             require: '^lxSelect',
-            scope: {
-                choices: '='
-            },
             templateUrl: 'lumx.select_choices.html',
-            transclude: true,
-            controller: function($scope)
-            {
-                $scope.select = function(choice, event)
-                {
-                    if (angular.isDefined(event) && $scope.selectController.isMultiple())
-                    {
-                        event.stopPropagation();
-                    }
-
-                    if ($scope.selectController.isMultiple())
-                    {
-                        if ($scope.isSelected(choice))
-                        {
-                            $scope.selectController.unselect(choice);
-                        }
-                        else
-                        {
-                            $scope.selectController.select(choice);
-                        }
-                    }
-                    else
-                    {
-                        $scope.selectController.select(choice);
-                    }
-                };
-
-                $scope.isSelected = function(choice)
-                {
-                    return _.indexOf($scope.selectController.selectedElements(), choice) > -1;
-                };
-            },
-            link: function(scope, element, attrs, ctrl)
-            {
-                scope.selectController = ctrl;
-            }
+            transclude: true
         };
     });
+
 /* global angular */
 'use strict'; // jshint ignore:line
 
@@ -2058,54 +2062,66 @@ angular.module("lumx.input-group").run(['$templateCache', function(a) { a.put('l
 	 }]);
 angular.module("lumx.select").run(['$templateCache', function(a) { a.put('lumx.select_selected.html', '<div lx-dropdown-toggle>\n' +
     '    <div class="lx-select__selected"\n' +
-    '         ng-class="{ \'lx-select__selected--is-unique\': !selectController.isMultiple(),\n' +
-    '                     \'lx-select__selected--is-multiple\': selectController.isMultiple(),\n' +
-    '                     \'lx-select__selected--placeholder\': selectController.selectedElements().length === 0 }"\n' +
+    '         ng-class="{ \'lx-select__selected--is-unique\': !multiple,\n' +
+    '                     \'lx-select__selected--is-multiple\': multiple,\n' +
+    '                     \'lx-select__selected--placeholder\': getSelectedElements().length === 0 }"\n' +
     '         lx-ripple>\n' +
-    '        <span ng-if="selectController.selectedElements().length === 0">{{ selectController.getPlaceholder() }}</span>\n' +
+    '        <span ng-if="getSelectedElements().length === 0">{{ placeholder }}</span>\n' +
     '\n' +
-    '        <div ng-repeat="$selected in selectController.selectedElements()"\n' +
-    '             ng-if="!selectController.isMultiple()">\n' +
-    '            <span ng-transclude="child"></span>\n' +
+    '        <div ng-repeat="$selected in getSelectedElements()"\n' +
+    '             ng-if="!multiple">\n' +
+    '            <span ng-transclude="parent"></span>\n' +
     '        </div>\n' +
     '\n' +
-    '        <div ng-if="selectController.isMultiple()">\n' +
+    '        <div ng-if="multiple">\n' +
     '            <span class="lx-select__tag"\n' +
-    '                  ng-repeat="$selected in selectController.selectedElements()"\n' +
+    '                  ng-repeat="$selected in getSelectedElements()"\n' +
     '                  ng-transclude="child"></span>\n' +
     '        </div>\n' +
     '    </div>\n' +
-    '</div>');
+    '</div>\n' +
+    '');
 	a.put('lumx.select_choices.html', '<lx-dropdown-menu full-width="32" from-top class="lx-select__choices">\n' +
-    '    <ul ng-if="!selectController.isTree()">\n' +
-    '        <li ng-if="selectController.selectedElements().length > 0">\n' +
+    '    <ul ng-if="!tree">\n' +
+    '        <li ng-if="getSelectedElements().length > 0">\n' +
     '            <div class="lx-select__chosen"\n' +
-    '                 ng-class="{ \'lx-select__chosen--is-multiple\': selectController.isMultiple() }"\n' +
-    '                 ng-bind-html="selectController.getSelectedTemplate()"></div>\n' +
+    '                 ng-class="{ \'lx-select__chosen--is-multiple\': multiple }"\n' +
+    '                 ng-bind-html="getSelectedTemplate()"></div>\n' +
     '        </li>\n' +
     '\n' +
     '        <li>\n' +
     '            <div class="lx-select__filter dropdown-filter">\n' +
-    '                <input type="text" ng-model="search" lx-dropdown-filter>\n' +
+    '                <input type="text" ng-model="data.filter" lx-dropdown-filter>\n' +
     '            </div>\n' +
     '        </li>\n' +
     '\n' +
-    '        <li ng-repeat="$choice in choices | filter:search">\n' +
+    '        <li class="lx-select__help" ng-if="!loading && (filterNeeded() || (hasNoResults() && !filterNeeded()))">\n' +
+    '            <span ng-if="!loading && filterNeeded()">Type minimum {{ minLength }} to search</span>\n' +
+    '            <span ng-if="!loading && hasNoResults() && !filterNeeded()">No results!</span>\n' +
+    '        </li>\n' +
+    '\n' +
+    '        <li ng-repeat="$choice in choices | filter:data.filter" ng-if="!loading && !hasNoResults() && !filterNeeded()">\n' +
     '            <a class="lx-select__choice dropdown-link"\n' +
-    '               ng-class="{ \'lx-select__choice--is-multiple\': selectController.isMultiple(),\n' +
+    '               ng-class="{ \'lx-select__choice--is-multiple\': multiple,\n' +
     '                           \'lx-select__choice--is-selected\': isSelected($choice) }"\n' +
-    '               ng-click="select($choice, $event)"\n' +
-    '               ng-transclude="child"></a>\n' +
+    '               ng-click="toggle($choice, $event)"\n' +
+    '               ng-transclude="parent"></a>\n' +
+    '        </li>\n' +
+    '\n' +
+    '        <li class="text--center" ng-if="loading">\n' +
+    '            <i class="mdi mdi--loop lx-select__loader"></i>\n' +
     '        </li>\n' +
     '    </ul>\n' +
-    '</lx-dropdown-menu>');
+    '</lx-dropdown-menu>\n' +
+    '');
 	a.put('lumx.select.html', '<div class="lx-select"\n' +
     '     ng-class="{ \'lx-select--is-unique\': !multiple,\n' +
     '                 \'lx-select--is-multiple\': multiple }">\n' +
     '    <lx-dropdown>\n' +
-    '        <div ng-transclude></div>\n' +
+    '        <div ng-transclude="parent"></div>\n' +
     '    </lx-dropdown>\n' +
-    '</div>');
+    '</div>\n' +
+    '');
 	 }]);
 angular.module("lumx.tabs").run(['$templateCache', function(a) { a.put('lumx.tabs.html', '<div class="tabs">\n' +
     '    <ul class="tabs__links">\n' +
