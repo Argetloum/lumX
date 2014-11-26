@@ -30,7 +30,7 @@ angular.module('lumx.select', [])
             {
                 $scope.selected = [choice];
             }
-        };
+        }
 
         function unselect(element)
         {
@@ -39,7 +39,7 @@ angular.module('lumx.select', [])
             {
                 $scope.selected.splice(index, 1);
             }
-        };
+        }
 
         function toggle(choice, event)
         {
@@ -56,13 +56,13 @@ angular.module('lumx.select', [])
             {
                 select(choice);
             }
-        };
+        }
 
         // Getters
         function isSelected(choice)
         {
             return _.indexOf(getSelectedElements(), choice) > -1;
-        };
+        }
 
         /**
          * Return the array of selected elements. Always return an array (ie. returns an empty array in case
@@ -71,15 +71,15 @@ angular.module('lumx.select', [])
         function getSelectedElements()
         {
             return angular.isDefined($scope.selected) ? $scope.selected : [];
-        };
+        }
 
         function getSelectedTemplate()
         {
             return $sce.trustAsHtml($scope.selectedTemplate);
-        };
+        }
 
         // Watchers
-        $scope.$watch('selected', function(newValue)
+        $scope.$watch('selected', function(newValue, oldValue)
         {
             if (angular.isDefined(newValue) && angular.isDefined($scope.selectedTransclude))
             {
@@ -110,12 +110,14 @@ angular.module('lumx.select', [])
                 });
 
                 // Exec function callback if set
-                if(angular.isDefined($scope.change))
-                {
-                    $scope.change();
-                }
+                $scope.change({ newValue: newValue, oldValue: oldValue });
             }
         }, true);
+
+        $scope.$watch('data.filter', function(newValue, oldValue)
+        {
+            $scope.filter({ newValue: newValue, oldValue: oldValue });
+        });
 
         // Public API
         $scope.select = select;
@@ -134,7 +136,8 @@ angular.module('lumx.select', [])
                 selected: '=',
                 placeholder: '=',
                 choices: '=',
-                change: '&'
+                change: '&', // Parameters: newValue, oldValue
+                filter: '&' // Parameters: newValue, oldValue
             },
             templateUrl: 'lumx.select.html',
             transclude: true,
@@ -142,6 +145,9 @@ angular.module('lumx.select', [])
             link: function(scope, element, attrs, ctrl)
             {
                 ctrl.init(element, attrs);
+                scope.data = {
+                    filter: ''
+                };
             }
         };
     })
